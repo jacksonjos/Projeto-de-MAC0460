@@ -14,25 +14,21 @@ using namespace std;
 using namespace boost::filesystem;
 using namespace cv;
 
-//location of the training data
+// Diretorio com as imagens de treinamento
 #define TRAINING_DATA_DIR "imagens/treinamento"
-//location of the evaluation data
+// Diretorio com as imagens de teste
 #define EVAL_DATA_DIR "imagens/teste"
 
-//See article on BoW model for details
 Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("FlannBased");
 Ptr<DescriptorExtractor> extractor = DescriptorExtractor::create("SURF");
 Ptr<FeatureDetector> detector = FeatureDetector::create("SURF");
 
-//See article on BoW model for details
 int dictionarySize = 1000;
 TermCriteria tc(CV_TERMCRIT_ITER, 10, 0.001);
 int retries = 1;
 int flags = KMEANS_PP_CENTERS;
 
-//See article on BoW model for details
 BOWKMeansTrainer bowTrainer(dictionarySize, tc, retries, flags);
-//See article on BoW model for details
 BOWImgDescriptorExtractor bowDE(extractor, matcher);
 
 /**
