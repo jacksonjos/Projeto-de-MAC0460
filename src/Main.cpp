@@ -15,9 +15,9 @@ using namespace boost::filesystem;
 using namespace cv;
 
 //location of the training data
-#define TRAINING_DATA_DIR "treinamento"
+#define TRAINING_DATA_DIR "imagens/treinamento"
 //location of the evaluation data
-#define EVAL_DATA_DIR "treinamento"
+#define EVAL_DATA_DIR "imagens/teste"
 
 //See article on BoW model for details
 Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("FlannBased");
