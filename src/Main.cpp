@@ -1,53 +1,78 @@
-/*
- * Main.cpp
+/* MAC0460 - Aprendizagem Computacional: Modelos, Agoritmos e Aplicacoes
+ * Professora Nina Hirata
  *
- *  Created on: 10/10/2012
- *      Author: su
- */
+ *
+ * Projeto da graduacao: Detector de monumentos
+ *
+ * Jackson José de Souza - 6796969
+ * Suzana de Siqueira Santos - 6909971
+ *
+ ******************************************************************************/
+
+
+/* ============================== BIBLIOTECAS =============================== */
 
 #include <cv.h>
 #include <opencv2/opencv.hpp>
 #include <highgui.h>
 #include <boost/filesystem.hpp>
+#include <vector>
+#include <boost/algorithm/string.hpp>
+#include <string>
 
 using namespace std;
 using namespace boost::filesystem;
 using namespace cv;
 
-// Diretorio com as imagens de treinamento
+
+/* ================================= MACROS ================================= */
+
+/* Diretorio com as imagens de treinamento */
 #define TRAINING_DATA_DIR "imagens/treinamento"
-// Diretorio com as imagens de teste
+/* Diretorio com as imagens de teste */
 #define EVAL_DATA_DIR "imagens/teste"
 
-Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("FlannBased");
-Ptr<DescriptorExtractor> extractor = DescriptorExtractor::create("SURF");
-Ptr<FeatureDetector> detector = FeatureDetector::create("SURF");
 
+/* ============================ VARIAVEIS GLOBAIS =========================== */
+
+vector<String> training_data; /* Vetor com o nome das imagens de treinamento */
+vector<String> test_data; /* Vetor com o nome das iamgens de teste */
+map<String, int> classes;
+/* Parametros do dicionario do modelo BOW */
 int dictionarySize = 1000;
 TermCriteria tc(CV_TERMCRIT_ITER, 10, 0.001);
 int retries = 1;
 int flags = KMEANS_PP_CENTERS;
 
+/* TODO: Transfomar em variaveis locais */
+Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("FlannBased");
+Ptr<DescriptorExtractor> extractor = DescriptorExtractor::create("SURF");
+Ptr<FeatureDetector> detector = FeatureDetector::create("SURF");
 BOWKMeansTrainer bowTrainer(dictionarySize, tc, retries, flags);
 BOWImgDescriptorExtractor bowDE(extractor, matcher);
 
+
 /**
- * \brief Recursively traverses a folder hierarchy. Extracts features from the training images and adds them to the bowTrainer.
+ * Inicializa vetor com os arquivos
  */
 void extractTrainingVocabulary(const path& basepath) {
     for (directory_iterator iter = directory_iterator(basepath); iter
             != directory_iterator(); iter++) {
         directory_entry entry = *iter;
-
         if (is_directory(entry.path())) {
 
             cout << "Processing directory " << entry.path().string() << endl;
             extractTrainingVocabulary(entry.path());
-
+            vector <string> classe;
+            boost::split(classe, entry.path().string(),  boost::is_any_of("/"));
+            if (classes.find(classe[2]) == classes.end()) {
+                cout << classe[2] << " -> " << classes.size() << endl;
+                classes[classe[2]] = classes.size();
+            }
         } else {
 
             path entryPath = entry.path();
-            if (entryPath.extension() == ".jpg") {
+            if (entryPath.extension() == ".png") {
 
                 cout << "Processing file " << entryPath.string() << endl;
                 Mat img = imread(entryPath.string());
@@ -84,7 +109,7 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
             extractBOWDescriptor(entry.path(), descriptors, labels);
         } else {
             path entryPath = entry.path();
-            if (entryPath.extension() == ".jpg") {
+            if (entryPath.extension() == ".png") {
                 cout << "Processing file " << entryPath.string() << endl;
                 Mat img = imread(entryPath.string());
                 if (!img.empty()) {
@@ -97,7 +122,11 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
                         Mat bowDescriptor;
                         bowDE.compute(img, keypoints, bowDescriptor);
                         descriptors.push_back(bowDescriptor);
-                        float label=atof(entryPath.filename().c_str());
+                        vector <string> classe;
+                        boost::split(classe, entryPath.string(),  boost::is_any_of("/"));
+                        float label= classes[classe[2]];
+                        cout << "\nIMAGEM " << entryPath.string() << " é da classe "  << classe[2] << " - " << label << endl;
+
                         labels.push_back(label);
                     }
                 } else {
@@ -142,7 +171,7 @@ int main(int argc, char ** argv) {
     classifier.predict(evalData, &results);
 
     double errorRate = (double) countNonZero(groundTruth - results) / evalData.rows;
-            ;
+
     cout << "Error rate: " << errorRate << endl;
 
 }
