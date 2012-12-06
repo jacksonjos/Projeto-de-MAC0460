@@ -47,7 +47,7 @@ void extractTrainingVocabulary(const path& basepath) {
         } else {
 
             path entryPath = entry.path();
-            if (entryPath.extension() == ".jpg") {
+            if (entryPath.extension() == ".png") {
 
                 cout << "Processing file " << entryPath.string() << endl;
                 Mat img = imread(entryPath.string());
@@ -84,7 +84,7 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
             extractBOWDescriptor(entry.path(), descriptors, labels);
         } else {
             path entryPath = entry.path();
-            if (entryPath.extension() == ".jpg") {
+            if (entryPath.extension() == ".png") {
                 cout << "Processing file " << entryPath.string() << endl;
                 Mat img = imread(entryPath.string());
                 if (!img.empty()) {
