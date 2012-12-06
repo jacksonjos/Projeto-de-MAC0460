@@ -46,11 +46,15 @@ int flags = KMEANS_PP_CENTERS;
 
 /* TODO: Transfomar em variaveis locais */
 Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("FlannBased");
-Ptr<DescriptorExtractor> extractor = DescriptorExtractor::create("SURF");
-Ptr<FeatureDetector> detector = FeatureDetector::create("SURF");
+Ptr<DescriptorExtractor> extractor;
+Ptr<FeatureDetector> detector;
 BOWKMeansTrainer bowTrainer(dictionarySize, tc, retries, flags);
-BOWImgDescriptorExtractor bowDE(extractor, matcher);
+Ptr<BOWImgDescriptorExtractor> bowDE;
 
+Ptr<Mat> trainingData;
+Ptr<Mat> labels;
+Ptr<Mat> evalData;
+Ptr<Mat> groundTruth;
 
 /**
  * Inicializa vetor com os arquivos
@@ -59,16 +63,15 @@ void extractTrainingVocabulary(const path& basepath) {
     for (directory_iterator iter = directory_iterator(basepath); iter
             != directory_iterator(); iter++) {
         directory_entry entry = *iter;
+        vector <string> classe;
         if (is_directory(entry.path())) {
-
-            cout << "Processing directory " << entry.path().string() << endl;
-            extractTrainingVocabulary(entry.path());
-            vector <string> classe;
             boost::split(classe, entry.path().string(),  boost::is_any_of("/"));
             if (classes.find(classe[2]) == classes.end()) {
-                cout << classe[2] << " -> " << classes.size() << endl;
                 classes[classe[2]] = classes.size();
+                cout << classe[2] << " -> " << classes[classe[2]] << endl;
             }
+            cout << "Processing directory " << entry.path().string() << endl;
+            extractTrainingVocabulary(entry.path());
         } else {
 
             path entryPath = entry.path();
@@ -120,7 +123,7 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
                                 << entryPath.string() << endl;
                     } else {
                         Mat bowDescriptor;
-                        bowDE.compute(img, keypoints, bowDescriptor);
+                        bowDE->compute(img, keypoints, bowDescriptor);
                         descriptors.push_back(bowDescriptor);
                         vector <string> classe;
                         boost::split(classe, entryPath.string(),  boost::is_any_of("/"));
@@ -138,9 +141,11 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
     }
 }
 
-int main(int argc, char ** argv) {
-
+void createDictionary(string d, string e) {
+    extractor = DescriptorExtractor::create(e);
+    detector = FeatureDetector::create(d);
     cout<<"Creating dictionary..."<<endl;
+    bowDE = new BOWImgDescriptorExtractor(extractor, matcher);
     extractTrainingVocabulary(path(TRAINING_DATA_DIR));
     vector<Mat> descriptors = bowTrainer.getDescriptors();
     int count=0;
@@ -150,97 +155,78 @@ int main(int argc, char ** argv) {
     }
     cout<<"Clustering "<<count<<" features"<<endl;
     Mat dictionary = bowTrainer.cluster();
-    bowDE.setVocabulary(dictionary);
-    cout<<"Processing training data..."<<endl;
-    Mat trainingData(0, dictionarySize, CV_32FC1);
-    Mat labels(0, 1, CV_32FC1);
-    extractBOWDescriptor(path(TRAINING_DATA_DIR), trainingData, labels);
-
-    NormalBayesClassifier classifier;
-    cout<<"Training classifier..."<<endl;
-
-    classifier.train(trainingData, labels);
-
-    cout<<"Processing evaluation data..."<<endl;
-    Mat evalData(0, dictionarySize, CV_32FC1);
-    Mat groundTruth(0, 1, CV_32FC1);
-    extractBOWDescriptor(path(EVAL_DATA_DIR), evalData, groundTruth);
-
-    cout<<"Evaluating classifier..."<<endl;
-    Mat results;
-    classifier.predict(evalData, &results);
-
-    double errorRate = (double) countNonZero(groundTruth - results) / evalData.rows;
-
-    cout << "Error rate: " << errorRate << endl;
-
+    bowDE->setVocabulary(dictionary);
 }
 
-int main2( int argc, char** argv ) {
-    Mat image;
-    Mat features;
-    vector<KeyPoint> keypoints;
-    Ptr<FeatureDetector> detector = FeatureDetector::create("SURF");
-    Ptr<DescriptorExtractor> extractor = DescriptorExtractor::create("SURF");
-    Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("FlannBased");
+void processTrainingData () {
+    cout<<"Processing training data..."<<endl;
+    trainingData = new Mat(0, dictionarySize, CV_32FC1);
+    labels = new Mat(0, 1, CV_32FC1);
+    extractBOWDescriptor(path(TRAINING_DATA_DIR), *trainingData, *labels);
+}
 
-    /* TODO entender os argumentos */
-    int dictionarySize = 1000;
-    TermCriteria tc(CV_TERMCRIT_ITER, 10, 0.001);
-    int retries = 1;
-    int flags = KMEANS_PP_CENTERS;
+void processEvaluationData() {
+    cout<<"Processing evaluation data..."<<endl;
+    evalData = new Mat(0, dictionarySize, CV_32FC1);
+    groundTruth = new Mat(0, 1, CV_32FC1);
+    extractBOWDescriptor(path(EVAL_DATA_DIR), *evalData, *groundTruth);
+}
 
-    BOWKMeansTrainer bowTrainer(dictionarySize, tc, retries, flags);
-    BOWImgDescriptorExtractor bowDE(extractor, matcher);
+/*
+void train (char name[]) {
+    if (strcmp(name, "NormalBayesClassifier") == 0) {
+        CvNormalBayesClassifier classifier;
+        classifier.train(*trainingData, *labels);
+    }
+    else if (strcmp(name, "KNearest") == 0) {
+        CvKNearest classifier;
+        classifier.train(*trainingData, *labels);
+    }
+    else if (strcmp(name, "SVM")) {
+        CvSVM classifier;
+        classifier.train(*trainingData, *labels);
+    }
+    else if (strcmp(name, "DTree")) {
+        CvDTree classifier;
+        classifier.train(*trainingData, *labels);
+    }
+    else if (strcmp(name, "Boost")) {
+        CvBoost classifier;
+        classifier.train(*trainingData, *labels);
+    }
+    else if (strcmp(name, "GradientBoostedTrees")) {
 
-    if (argc != 2) {
-        printf( "Uso:\n./%s nome_da_imagem\n", argv[0]);
-        return -1;
+    }
+    else if (strcmp("Random Trees")) {
+
+    }
+    else if ("ExpectationMaximization") {
+
+    }
+    else if ("NeuralNetworks") {
+
     }
 
-    image = imread( argv[1], 1 );
-    if (!image.data) {
-        printf("Erro ao abrir arquivo %s\n", argv[1]);
-        return -1;
-    }
+}
+*/
 
-    /* TODO Para cada imagem de treinamento */
-    detector->detect(image, keypoints);
-    extractor->compute(image, keypoints, features);
-    bowTrainer.add(features);
+int main(int argc, char ** argv) {
+    char extractors[][6] = {"SIFT", "SURF", "ORB", "BRIEF"};
+    char detectors[][11] = {"FAST", "STAR", "SIFT", "SURF", "ORB", "MSER", "GFTT", "HARRIS", "Dense", "SimpleBlob"};
 
-    /* Criação do dicionário */
-    Mat dictionary = bowTrainer.cluster();
-    bowDE.setVocabulary(dictionary);
+    createDictionary(detectors[3], extractors[1]);
+    processTrainingData();
 
-    Mat trainingData(0, dictionarySize, CV_32FC1);
-    Mat labels(0, 1, CV_32FC1);
+    CvNormalBayesClassifier classifier;
+    cout<<"Training classifier..."<<endl;
+    classifier.train(*trainingData, *labels);
 
-    /* TODO Para cada imagem de treinamento */
-    detector->detect(image, keypoints);
-    Mat bowDescriptor;
-    bowDE.compute(image, keypoints, bowDescriptor);
-    trainingData.push_back(bowDescriptor);
-    /* float label=atof(entryPath.filename().c_str());
-labels.push_back(label); */
-
-    /* Treinamento do classificador */
-    NormalBayesClassifier classifier;
-    classifier.train(trainingData, labels);
-
-    Mat evalData(0, dictionarySize, CV_32FC1);
-    Mat groundTruth(0, 1, CV_32FC1);
-    /* TODO Para cada imagem de validação */
-    detector->detect(image, keypoints);
-    bowDE.compute(image, keypoints, bowDescriptor);
-    evalData.push_back(bowDescriptor);
-    /*label=atof(entryPath.filename().c_str());
-groundTruth.push_back(label); */
-
-    /* Avaliação */
+    processEvaluationData();
+    cout<<"Evaluating classifier..."<<endl;
     Mat results;
-    classifier.predict(evalData, &results);
-    double errorRate = (double) countNonZero(groundTruth - results) / evalData.rows;
+    classifier.predict(*evalData, &results);
 
-    return 0;
+    double errorRate = (double) countNonZero(*groundTruth - results) / evalData->rows;
+
+   cout << "Error rate: " << errorRate << endl;
 }
