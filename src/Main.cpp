@@ -32,17 +32,23 @@ using namespace cv;
 /* Diretorio com as imagens de teste */
 #define EVAL_DATA_DIR "imagens/teste"
 
+#define NDETECTORS 4
+#define NEXTRACTORS 2
+#define NCLASSIFIERS 2
 
 /* ============================ VARIAVEIS GLOBAIS =========================== */
+
+int confusionMatrix[6][6];                          //GAMBIIIIIIII
 
 vector<String> training_data; /* Vetor com o nome das imagens de treinamento */
 vector<String> test_data; /* Vetor com o nome das iamgens de teste */
 map<String, int> classes;
 /* Parametros do dicionario do modelo BOW */
-int dictionarySize = 1000;
+int dictionarySize = 300;
 TermCriteria tc(CV_TERMCRIT_ITER, 10, 0.001);
 int retries = 1;
 int flags = KMEANS_PP_CENTERS;
+Mat results;
 
 /* TODO: Transfomar em variaveis locais */
 Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("FlannBased");
@@ -55,6 +61,32 @@ Ptr<Mat> trainingData;
 Ptr<Mat> labels;
 Ptr<Mat> evalData;
 Ptr<Mat> groundTruth;
+
+CvNormalBayesClassifier NBclassifier;
+CvKNearest KNNclassifier;
+CvSVM SVMclassifier;
+CvDTree DTclassifier;
+
+void createAndFillConfusionMatrix (Mat realValues, Mat supposedRealValues) {            //Tirar testes e printfs
+    int i, j;
+
+    for (i = 0; i < 6; i++) //colocar o valor verdadeiro
+        for (j = 0; j < 6; j++)
+            confusionMatrix[i][j] = 0;
+
+    for (i = 0;(i < realValues.rows) && (i < supposedRealValues.rows); i++) {
+        confusionMatrix[(int)supposedRealValues.at<float>(i,0)-1][(int)realValues.at<float>(i,0)-1]++;
+        //printf("realValue %.0f supposedRealValue %.0f\n", realValues.at<float>(i,0), supposedRealValues.at<float>(i,0));
+    }
+
+    printf("Matriz de confusao:\n1\t2\t3\t4\t5\t6\n");          //TESTE
+    for (i = 0; i < 6; i++) {
+        for (j = 0; j < 6; j++)
+            printf("%d \t", confusionMatrix[i][j]);
+        printf("%d\n", i+1);
+    }
+}
+
 
 /**
  * Inicializa vetor com os arquivos
@@ -70,20 +102,20 @@ void extractTrainingVocabulary(const path& basepath) {
                 classes[classe[2]] = classes.size();
                 cout << classe[2] << " -> " << classes[classe[2]] << endl;
             }
-            cout << "Processing directory " << entry.path().string() << endl;
+            //cout << "Processing directory " << entry.path().string() << endl;
             extractTrainingVocabulary(entry.path());
         } else {
 
             path entryPath = entry.path();
             if (entryPath.extension() == ".png") {
 
-                cout << "Processing file " << entryPath.string() << endl;
+                //cout << "Processing file " << entryPath.string() << endl;
                 Mat img = imread(entryPath.string());
                 if (!img.empty()) {
                     vector<KeyPoint> keypoints;
                     detector->detect(img, keypoints);
                     if (keypoints.empty()) {
-                        cerr << "Warning: Could not find key points in image: "
+                        cerr << "Erro ao extrair keypoints da imagem: "
                                 << entryPath.string() << endl;
                     } else {
                         Mat features;
@@ -91,7 +123,7 @@ void extractTrainingVocabulary(const path& basepath) {
                         bowTrainer.add(features);
                     }
                 } else {
-                    cerr << "Warning: Could not read image: "
+                    cerr << "Erro ao abrir a imagem: "
                             << entryPath.string() << endl;
                 }
 
@@ -108,18 +140,18 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
             != directory_iterator(); iter++) {
         directory_entry entry = *iter;
         if (is_directory(entry.path())) {
-            cout << "Processing directory " << entry.path().string() << endl;
+            //cout << "Processing directory " << entry.path().string() << endl;
             extractBOWDescriptor(entry.path(), descriptors, labels);
         } else {
             path entryPath = entry.path();
             if (entryPath.extension() == ".png") {
-                cout << "Processing file " << entryPath.string() << endl;
+              //  cout << "Processing file " << entryPath.string() << endl;
                 Mat img = imread(entryPath.string());
                 if (!img.empty()) {
                     vector<KeyPoint> keypoints;
                     detector->detect(img, keypoints);
                     if (keypoints.empty()) {
-                        cerr << "Warning: Could not find key points in image: "
+                        cerr << "Erro ao extrair keypoints da imagem: "
                                 << entryPath.string() << endl;
                     } else {
                         Mat bowDescriptor;
@@ -128,12 +160,12 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
                         vector <string> classe;
                         boost::split(classe, entryPath.string(),  boost::is_any_of("/"));
                         float label= classes[classe[2]];
-                        cout << "\nIMAGEM " << entryPath.string() << " é da classe "  << classe[2] << " - " << label << endl;
+                        //cout << "\nIMAGEM " << entryPath.string() << " é da classe "  << classe[2] << " - " << label << endl;
 
                         labels.push_back(label);
                     }
                 } else {
-                    cerr << "Warning: Could not read image: "
+                    cerr << "Erro ao abrir a imagem: "
                             << entryPath.string() << endl;
                 }
             }
@@ -144,7 +176,11 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
 void createDictionary(string d, string e) {
     extractor = DescriptorExtractor::create(e);
     detector = FeatureDetector::create(d);
-    cout<<"Creating dictionary..."<<endl;
+    if (extractor ==  NULL )
+        cerr << "Erro ao criar extrator de descritor: " << e << endl;
+    if (detector == NULL)
+        cerr << "Erro ao criar detector de feature: " << d << endl;
+    cout<<"Criando dicionario..."<<endl;
     bowDE = new BOWImgDescriptorExtractor(extractor, matcher);
     extractTrainingVocabulary(path(TRAINING_DATA_DIR));
     vector<Mat> descriptors = bowTrainer.getDescriptors();
@@ -153,80 +189,124 @@ void createDictionary(string d, string e) {
     {
         count+=iter->rows;
     }
-    cout<<"Clustering "<<count<<" features"<<endl;
+    cout<<"\"Clusterizando\" "<<count<<" features"<<endl;
     Mat dictionary = bowTrainer.cluster();
     bowDE->setVocabulary(dictionary);
 }
 
 void processTrainingData () {
-    cout<<"Processing training data..."<<endl;
+    cout<<"Processando conjunto de treinamento..."<<endl;
     trainingData = new Mat(0, dictionarySize, CV_32FC1);
     labels = new Mat(0, 1, CV_32FC1);
     extractBOWDescriptor(path(TRAINING_DATA_DIR), *trainingData, *labels);
 }
 
 void processEvaluationData() {
-    cout<<"Processing evaluation data..."<<endl;
+    cout<<"Processando comjunto de teste..."<<endl;
     evalData = new Mat(0, dictionarySize, CV_32FC1);
     groundTruth = new Mat(0, 1, CV_32FC1);
     extractBOWDescriptor(path(EVAL_DATA_DIR), *evalData, *groundTruth);
 }
 
-/*
+
 void train (char name[]) {
-    if (strcmp(name, "NormalBayesClassifier") == 0) {
-        CvNormalBayesClassifier classifier;
-        classifier.train(*trainingData, *labels);
-    }
-    else if (strcmp(name, "KNearest") == 0) {
-        CvKNearest classifier;
-        classifier.train(*trainingData, *labels);
-    }
-    else if (strcmp(name, "SVM")) {
-        CvSVM classifier;
-        classifier.train(*trainingData, *labels);
-    }
-    else if (strcmp(name, "DTree")) {
-        CvDTree classifier;
-        classifier.train(*trainingData, *labels);
-    }
-    else if (strcmp(name, "Boost")) {
+    if (strcmp(name, "NormalBayesClassifier") == 0)
+        NBclassifier.train(*trainingData, *labels);
+    else if (strcmp(name, "KNearest") == 0)
+        KNNclassifier.train(*trainingData, *labels);
+    else if (strcmp(name, "SVM") == 0)
+        SVMclassifier.train(*trainingData, *labels);
+    else if (strcmp(name, "DTree") == 0)
+        DTclassifier.train(*trainingData, CV_ROW_SAMPLE, *labels);
+
+    /*
+    else if (strcmp(name, "Boost") == 0) {
         CvBoost classifier;
+        classifier.train(*trainingData, CV_ROW_SAMPLE, *labels);
+    }
+    else if (strcmp(name, "GradientBoostedTrees") == 0) {
+        CvGBTrees classifier;
+        classifier.train(*trainingData,  CV_ROW_SAMPLE, *labels);
+    }
+    else if (strcmp(name, "RandomTrees") == 0) {
+        CvRTrees classifier;
+        classifier.train(*trainingData,  CV_ROW_SAMPLE, *labels);
+    }
+
+    else if (strcmp(name, "NeuralNetworks") == 0) {
+        CvANN_MLP classifier;
         classifier.train(*trainingData, *labels);
-    }
-    else if (strcmp(name, "GradientBoostedTrees")) {
-
-    }
-    else if (strcmp("Random Trees")) {
-
-    }
-    else if ("ExpectationMaximization") {
-
-    }
-    else if ("NeuralNetworks") {
-
-    }
+    }*/
 
 }
-*/
+
+void predict (char name[]) {
+    if (strcmp(name, "NormalBayesClassifier") == 0)
+        NBclassifier.predict(*evalData, &results);
+
+    else if (strcmp(name, "KNearest") == 0)
+        KNNclassifier.find_nearest(*evalData, 1, &results);
+
+    else if (strcmp(name, "SVM") == 0) {
+        int i;
+        results = *(new Mat(evalData->rows, 1, CV_32FC1));
+        for (i = 0; i < evalData->rows; i++)
+            results.at<float>(i, 0) = SVMclassifier.predict(evalData->row(i));
+    }
+
+    else if (strcmp(name, "DTree") == 0) {
+        int i;
+        results = *(new Mat(evalData->rows, 1, CV_32FC1));
+        for (i = 0; i < evalData->rows; i++)
+            results.at<float>(i, 0) = DTclassifier.predict(evalData->row(i))->value;
+    }
+    /*
+    else if (strcmp(name, "Boost") == 0) {
+        CvBoost classifier;
+        classifier.predict(*evalData, &results);
+    }
+    else if (strcmp(name, "GradientBoostedTrees") == 0) {
+        CvGBTrees classifier;
+        classifier.predict(*trainingData, &results);
+    }
+    else if (strcmp(name, "RandomTrees") == 0) {
+        CvRTrees classifier;
+        classifier.predict(*trainingData, &results);
+    }
+
+    else if (strcmp(name, "NeuralNetworks") == 0) {
+        CvANN_MLP classifier;
+        classifier.train(*trainingData, *labels);
+    }*/
+
+}
 
 int main(int argc, char ** argv) {
-    char extractors[][6] = {"SIFT", "SURF", "ORB", "BRIEF"};
-    char detectors[][11] = {"FAST", "STAR", "SIFT", "SURF", "ORB", "MSER", "GFTT", "HARRIS", "Dense", "SimpleBlob"};
+    char extractors[][6] = {"SIFT", "SURF"}; // "BRIEF", "ORB"
+    char detectors[][11] = {"FAST", "STAR", "SIFT", "SURF"};
+    //"ORB", "MSER", "GFTT", "HARRIS", "Dense", "SimpleBlob"};
 
-    createDictionary(detectors[3], extractors[1]);
-    processTrainingData();
+    char classifiers[][22] = {"NormalBayesClassifier", "KNearest"};
 
-    CvNormalBayesClassifier classifier;
-    cout<<"Training classifier..."<<endl;
-    classifier.train(*trainingData, *labels);
+    int i, j, k;
 
-    processEvaluationData();
-    cout<<"Evaluating classifier..."<<endl;
-    Mat results;
-    classifier.predict(*evalData, &results);
+    for (i = 0; i < NDETECTORS; i++) {
+        for (j = 0; j < NEXTRACTORS; j++) {
+            createDictionary(detectors[i], extractors[j]);
+            processTrainingData();
+            processEvaluationData();
+            for (k = 0; k < NCLASSIFIERS; k++) {
+                printf("\n_______ %s - %s - %s _______\n", classifiers[k], detectors[i], extractors[j]);
+                cout<<"Treinando classificador..."<<endl;
+                train(classifiers[k]);
+                cout<<"Avaliando classificador..."<<endl;
+                predict(classifiers[k]);
+                double errorRate = (double) countNonZero(*groundTruth - results) / evalData->rows;
 
-    double errorRate = (double) countNonZero(*groundTruth - results) / evalData->rows;
+                cout << "Taxa de erro: " << errorRate << endl;
+                createAndFillConfusionMatrix(*groundTruth, results);
+            }
 
-   cout << "Error rate: " << errorRate << endl;
+        }
+    }
 }
