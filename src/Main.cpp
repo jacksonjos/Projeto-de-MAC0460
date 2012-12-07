@@ -35,7 +35,7 @@ using namespace cv;
 
 #define NDETECTORS 4
 #define NEXTRACTORS 2
-#define NCLASSIFIERS 1
+#define NCLASSIFIERS 2
 
 /* ============================ VARIAVEIS GLOBAIS =========================== */
 
@@ -309,7 +309,7 @@ int main(int argc, char ** argv) {
     char detectors[][11] = {"FAST", "STAR", "SIFT", "SURF"};
     //"ORB", "MSER", "GFTT", "HARRIS", "Dense", "SimpleBlob"};
 
-    char classifiers[][22] = {"DTree", "SVM", "NormalBayesClassifier", "KNearest"};
+    char classifiers[][22] = {"NormalBayesClassifier", "KNearest", "DTree", "SVM"};
 
     int i, j, k;
 
