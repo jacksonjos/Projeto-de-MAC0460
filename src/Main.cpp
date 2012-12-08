@@ -13,6 +13,7 @@
 /* ============================== BIBLIOTECAS =============================== */
 
 #include <cv.h>
+#include <cmath>
 #include <opencv2/opencv.hpp>
 #include <highgui.h>
 #include <boost/filesystem.hpp>
@@ -79,12 +80,22 @@ void createAndFillConfusionMatrix (Mat realValues, Mat supposedRealValues) {    
         //printf("realValue %.0f supposedRealValue %.0f\n", realValues.at<float>(i,0), supposedRealValues.at<float>(i,0));
     }
 
-    printf("Matriz de confusao:\n1\t2\t3\t4\t5\t6\n");          //TESTE
+    printf("Matriz de confusao:\n \t1\t2\t3\t4\t5\t6\n\n");          //TESTE
     for (i = 0; i < 6; i++) {
+    	printf("%d", i+1);
         for (j = 0; j < 6; j++)
-            printf("%d \t", confusionMatrix[i][j]);
-        printf("%d\n", i+1);
+            printf("\t%d", confusionMatrix[i][j]);
+    	printf("\n");
     }
+}
+
+// Calcula intervalo de confiança para erro "errorRate" com intervalo de confiança 
+void confidenceInterval(double errorRate, int n) {
+	double moduloDoIntervalo, Zn = 1.96;
+	moduloDoIntervalo = Zn*sqrt(errorRate*(1-errorRate)/n);
+	
+	printf("O intervalo de confiança é: ]%f, %f[\n", errorRate - moduloDoIntervalo,
+													errorRate + moduloDoIntervalo);
 }
 
 
@@ -304,6 +315,7 @@ int main(int argc, char ** argv) {
                 double errorRate = (double) countNonZero(*groundTruth - results) / evalData->rows;
 
                 cout << "Taxa de erro: " << errorRate << endl;
+				confidenceInterval(errorRate, results.rows);
                 createAndFillConfusionMatrix(*groundTruth, results);
             }
 
