@@ -35,7 +35,7 @@ using namespace cv;
 
 #define NDETECTORS 4
 #define NEXTRACTORS 2
-#define NCLASSIFIERS 2
+#define NCLASSIFIERS 1
 
 /* ============================ VARIAVEIS GLOBAIS =========================== */
 
@@ -49,7 +49,7 @@ int dictionarySize = 300;
 TermCriteria tc(CV_TERMCRIT_ITER, 10, 0.001);
 int retries = 1;
 int flags = KMEANS_PP_CENTERS;
-Mat results;
+
 
 /* TODO: Transfomar em variaveis locais */
 Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("FlannBased");
@@ -58,15 +58,11 @@ Ptr<FeatureDetector> detector;
 Ptr<BOWKMeansTrainer> bowTrainer;
 Ptr<BOWImgDescriptorExtractor> bowDE;
 
-Ptr<Mat> trainingData;
-Ptr<Mat> labels;
-Ptr<Mat> evalData;
-Ptr<Mat> groundTruth;
-
 CvNormalBayesClassifier NBclassifier;
 CvKNearest KNNclassifier;
 CvSVM SVMclassifier;
 CvDTree DTclassifier;
+
 
 void createAndFillConfusionMatrix (Mat realValues, Mat supposedRealValues) {            //Tirar testes e printfs
     int i, j;
@@ -196,15 +192,15 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
 }
 
 void createDictionary(string d, string e) {
-    bowTrainer =  new BOWKMeansTrainer(dictionarySize, tc, retries, flags);
     extractor = DescriptorExtractor::create(e);
     detector = FeatureDetector::create(d);
     if (extractor ==  NULL )
-        cerr << "Erro ao criar extrator de descritor: " << e << endl;
-    if (detector == NULL)
-        cerr << "Erro ao criar detector de feature: " << d << endl;
-    cout<<"Criando dicionario..."<<endl;
+           cerr << "Erro ao criar extrator de descritor: " << e << endl;
+       if (detector == NULL)
+           cerr << "Erro ao criar detector de feature: " << d << endl;
+    bowTrainer =  new BOWKMeansTrainer(dictionarySize, tc, retries, flags);
     bowDE = new BOWImgDescriptorExtractor(extractor, matcher);
+    cout<<"Criando dicionario..."<<endl;
     extractTrainingVocabulary(path(TRAINING_DATA_DIR));
     vector<Mat> descriptors = bowTrainer->getDescriptors();
     int count=0;
@@ -217,30 +213,15 @@ void createDictionary(string d, string e) {
     bowDE->setVocabulary(dictionary);
 }
 
-void processTrainingData () {
-    cout<<"Processando conjunto de treinamento..."<<endl;
-    trainingData = new Mat(0, dictionarySize, CV_32FC1);
-    labels = new Mat(0, 1, CV_32FC1);
-    extractBOWDescriptor(path(TRAINING_DATA_DIR), *trainingData, *labels);
-}
-
-void processEvaluationData() {
-    cout<<"Processando comjunto de teste..."<<endl;
-    evalData = new Mat(0, dictionarySize, CV_32FC1);
-    groundTruth = new Mat(0, 1, CV_32FC1);
-    extractBOWDescriptor(path(EVAL_DATA_DIR), *evalData, *groundTruth);
-}
-
-
-void train (char name[]) {
+void train (char name[], Mat trainingData, Mat labels) {
     if (strcmp(name, "NormalBayesClassifier") == 0)
-        NBclassifier.train(*trainingData, *labels);
+        NBclassifier.train(trainingData, labels);
     else if (strcmp(name, "KNearest") == 0)
-        KNNclassifier.train(*trainingData, *labels);
+        KNNclassifier.train(trainingData, labels);
     else if (strcmp(name, "SVM") == 0)
-        SVMclassifier.train(*trainingData, *labels);
+        SVMclassifier.train(trainingData, labels);
     else if (strcmp(name, "DTree") == 0)
-        DTclassifier.train(*trainingData, CV_ROW_SAMPLE, *labels);
+        DTclassifier.train(trainingData, CV_ROW_SAMPLE, labels);
 
     /*
     else if (strcmp(name, "Boost") == 0) {
@@ -263,25 +244,25 @@ void train (char name[]) {
 
 }
 
-void predict (char name[]) {
+void predict (char name[], Mat evalData, Mat * results) {
     if (strcmp(name, "NormalBayesClassifier") == 0)
-        NBclassifier.predict(*evalData, &results);
+        NBclassifier.predict(evalData, results);
 
     else if (strcmp(name, "KNearest") == 0)
-        KNNclassifier.find_nearest(*evalData, 1, &results);
+        KNNclassifier.find_nearest(evalData, 1, results);
 
     else if (strcmp(name, "SVM") == 0) {
         int i;
-        results = *(new Mat(evalData->rows, 1, CV_32FC1));
-        for (i = 0; i < evalData->rows; i++)
-            results.at<float>(i, 0) = SVMclassifier.predict(evalData->row(i));
+        results = new Mat(evalData.rows, 1, CV_32FC1);
+        for (i = 0; i < evalData.rows; i++)
+            results->at<float>(i, 0) = SVMclassifier.predict(evalData.row(i));
     }
 
     else if (strcmp(name, "DTree") == 0) {
         int i;
-        results = *(new Mat(evalData->rows, 1, CV_32FC1));
-        for (i = 0; i < evalData->rows; i++)
-            results.at<float>(i, 0) = DTclassifier.predict(evalData->row(i))->value;
+        results = new Mat(evalData.rows, 1, CV_32FC1);
+        for (i = 0; i < evalData.rows; i++)
+            results->at<float>(i, 0) = DTclassifier.predict(evalData.row(i))->value;
     }
     /*
     else if (strcmp(name, "Boost") == 0) {
@@ -305,30 +286,39 @@ void predict (char name[]) {
 }
 
 int main(int argc, char ** argv) {
-    char extractors[][6] = {"SIFT", "SURF"}; // "BRIEF", "ORB"
-    char detectors[][11] = {"FAST", "STAR", "SIFT", "SURF"};
+    string extractors[] = {"SIFT", "SURF"}; // "BRIEF", "ORB"
+    string detectors[] = {"FAST", "STAR", "SIFT", "SURF"};
     //"ORB", "MSER", "GFTT", "HARRIS", "Dense", "SimpleBlob"};
 
-    char classifiers[][22] = {"NormalBayesClassifier", "KNearest", "DTree", "SVM"};
+    char classifiers[][22] = {"NormalBayesClassifier", "KNearest", "SVM", "DTree"};
 
     int i, j, k;
 
     for (i = 0; i < NDETECTORS; i++) {
         for (j = 0; j < NEXTRACTORS; j++) {
-            createDictionary(detectors[i], extractors[j]);
-            processTrainingData();
-            processEvaluationData();
+            createDictionary(detectors[3], extractors[1]);
+            Mat results;
+            Mat trainingData(0, dictionarySize, CV_32FC1);
+            Mat labels(0, 1, CV_32FC1);
+            Mat evalData(0, dictionarySize, CV_32FC1);
+            Mat groundTruth(0, 1, CV_32FC1);
+            cout<<"Processando conjunto de treinamento..."<<endl;
+            extractBOWDescriptor(path(TRAINING_DATA_DIR), trainingData, labels);
+            cout<<"Processando conjunto de teste..."<<endl;
+            extractBOWDescriptor(path(EVAL_DATA_DIR), evalData, groundTruth);
             for (k = 0; k < NCLASSIFIERS; k++) {
-                printf("\n_______ %s - %s - %s _______\n", classifiers[k], detectors[i], extractors[j]);
+                cout << "\n_______" << classifiers[k] << " - "<< detectors[3] << " - " << extractors[1] << "_______\n";
                 cout<<"Treinando classificador..."<<endl;
-                train(classifiers[k]);
+                //train(classifiers[k], trainingData, labels);
+                NormalBayesClassifier c;
+                c.train(trainingData, labels);
                 cout<<"Avaliando classificador..."<<endl;
-                predict(classifiers[k]);
-                double errorRate = (double) countNonZero(*groundTruth - results) / evalData->rows;
-
+                c.predict(evalData, &results);
+                //predict(classifiers[k], evalData, &results);
+                double errorRate = (double) countNonZero(groundTruth - results) / evalData.rows;
                 cout << "Taxa de erro: " << errorRate << endl;
 				confidenceInterval(errorRate, results.rows);
-                createAndFillConfusionMatrix(*groundTruth, results);
+                createAndFillConfusionMatrix(groundTruth, results);
             }
 
         }
