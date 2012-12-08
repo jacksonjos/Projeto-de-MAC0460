@@ -216,8 +216,7 @@ void train (char name[], Mat trainingData, Mat labels) {
         SVMclassifier.train(trainingData, labels);
     else if (strcmp(name, "DTree") == 0)
         DTclassifier.train(trainingData, CV_ROW_SAMPLE, labels);
-    else if (strcmp(name, "Boost") == 0)
-        Bclassifier.train(trainingData, CV_ROW_SAMPLE, labels);
+
 
     /*
     else if (strcmp(name, "GradientBoostedTrees") == 0) {
@@ -254,11 +253,7 @@ void predict (char name[], Mat evalData, Mat * results) {
         for (i = 0; i < evalData.rows; i++)
             results->push_back(DTclassifier.predict(evalData.row(i))->value);
     }
-    else if (strcmp(name, "Boost") == 0) {
-         int i;
-         for (i = 0; i < evalData.rows; i++)
-             results->push_back(Bclassifier.predict(evalData.row(i)));
-     }
+
     /*
     else if (strcmp(name, "Boost") == 0) {
         CvBoost classifier;
@@ -300,7 +295,7 @@ int main(int argc, char ** argv) {
     cout << "\n_______" << argv[3] << " - "<< argv[1] << " - " << argv[2] << "_______\n";
     cout<<"Treinando classificador..."<<endl;
     train(argv[3], trainingData, labels);
-    Mat results;
+    Mat results(0, 1, CV_32FC1);
     cout<<"Avaliando classificador..."<<endl;
     predict(argv[3], evalData, &results);
     double errorRate = (double) countNonZero(groundTruth - results) / evalData.rows;
