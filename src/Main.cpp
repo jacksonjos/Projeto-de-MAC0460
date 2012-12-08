@@ -251,9 +251,8 @@ void predict (char name[], Mat evalData, Mat * results) {
 
     else if (strcmp(name, "DTree") == 0) {
         int i;
-        results = new Mat(evalData.rows, 1, CV_32FC1);
         for (i = 0; i < evalData.rows; i++)
-            results->at<float>(i, 0) = DTclassifier.predict(evalData.row(i))->value;
+            results->push_back(DTclassifier.predict(evalData.row(i))->value);
     }
     else if (strcmp(name, "Boost") == 0) {
          int i;
