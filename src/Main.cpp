@@ -35,7 +35,7 @@ using namespace cv;
 
 #define NDETECTORS 4
 #define NEXTRACTORS 2
-#define NCLASSIFIERS 2
+#define NCLASSIFIERS 1
 
 /* ============================ VARIAVEIS GLOBAIS =========================== */
 
@@ -55,7 +55,7 @@ Mat results;
 Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("FlannBased");
 Ptr<DescriptorExtractor> extractor;
 Ptr<FeatureDetector> detector;
-BOWKMeansTrainer bowTrainer(dictionarySize, tc, retries, flags);
+Ptr<BOWKMeansTrainer> bowTrainer;
 Ptr<BOWImgDescriptorExtractor> bowDE;
 
 Ptr<Mat> trainingData;
@@ -131,7 +131,7 @@ void extractTrainingVocabulary(const path& basepath) {
                     } else {
                         Mat features;
                         extractor->compute(img, keypoints, features);
-                        bowTrainer.add(features);
+                        bowTrainer->add(features);
                     }
                 } else {
                     cerr << "Erro ao abrir a imagem: "
@@ -185,6 +185,7 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
 }
 
 void createDictionary(string d, string e) {
+    bowTrainer =  new BOWKMeansTrainer(dictionarySize, tc, retries, flags);
     extractor = DescriptorExtractor::create(e);
     detector = FeatureDetector::create(d);
     if (extractor ==  NULL )
@@ -194,14 +195,14 @@ void createDictionary(string d, string e) {
     cout<<"Criando dicionario..."<<endl;
     bowDE = new BOWImgDescriptorExtractor(extractor, matcher);
     extractTrainingVocabulary(path(TRAINING_DATA_DIR));
-    vector<Mat> descriptors = bowTrainer.getDescriptors();
+    vector<Mat> descriptors = bowTrainer->getDescriptors();
     int count=0;
     for(vector<Mat>::iterator iter=descriptors.begin();iter!=descriptors.end();iter++)
     {
         count+=iter->rows;
     }
     cout<<"\"Clusterizando\" "<<count<<" features"<<endl;
-    Mat dictionary = bowTrainer.cluster();
+    Mat dictionary = bowTrainer->cluster();
     bowDE->setVocabulary(dictionary);
 }
 
@@ -297,7 +298,7 @@ int main(int argc, char ** argv) {
     char detectors[][11] = {"FAST", "STAR", "SIFT", "SURF"};
     //"ORB", "MSER", "GFTT", "HARRIS", "Dense", "SimpleBlob"};
 
-    char classifiers[][22] = {"NormalBayesClassifier", "KNearest"};
+    char classifiers[][22] = {"DTree", "SVM", "NormalBayesClassifier", "KNearest"};
 
     int i, j, k;
 
