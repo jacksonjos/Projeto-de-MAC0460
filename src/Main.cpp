@@ -92,10 +92,20 @@ void createAndFillConfusionMatrix (Mat realValues, Mat supposedRealValues) {    
 // Calcula intervalo de confiança para erro "errorRate" com intervalo de confiança 
 void confidenceInterval(double errorRate, int n) {
 	double moduloDoIntervalo, Zn = 1.96;
+	double menorValor, maiorValor;
+	if ((errorRate - moduloDoIntervalo) < 0)
+		 menorValor = 0;
+	else
+		menorValor = errorRate - moduloDoIntervalo;
+		
+	if ((errorRate + moduloDoIntervalo) > 1)
+		 maiorValor = 1;
+	else
+		maiorValor = errorRate + moduloDoIntervalo;
+		
 	moduloDoIntervalo = Zn*sqrt(errorRate*(1-errorRate)/n);
 	
-	printf("O intervalo de confiança é: ]%f, %f[\n", errorRate - moduloDoIntervalo,
-													errorRate + moduloDoIntervalo);
+	printf("O intervalo de confiança é: ]%f, %f[\n", menorValor, maiorValor);
 }
 
 
