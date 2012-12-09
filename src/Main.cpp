@@ -33,16 +33,11 @@ using namespace cv;
 /* Diretorio com as imagens de teste */
 #define EVAL_DATA_DIR "imagens/teste"
 
-#define NDETECTORS 4
-#define NEXTRACTORS 2
-#define NCLASSIFIERS 1
 
 /* ============================ VARIAVEIS GLOBAIS =========================== */
 
 int confusionMatrix[6][6];                          //GAMBIIIIIIII
 
-vector<String> training_data; /* Vetor com o nome das imagens de treinamento */
-vector<String> test_data; /* Vetor com o nome das iamgens de teste */
 map<String, int> classes;
 /* Parametros do dicionario do modelo BOW */
 int dictionarySize = 1000;
@@ -50,9 +45,7 @@ TermCriteria tc(CV_TERMCRIT_ITER, 10, 0.001);
 int retries = 1;
 int flags = KMEANS_PP_CENTERS;
 
-
-/* TODO: Transfomar em variaveis locais */
-Ptr<DescriptorMatcher> matcher = DescriptorMatcher::create("FlannBased");
+Ptr<DescriptorMatcher> matcher;
 Ptr<DescriptorExtractor> extractor;
 Ptr<FeatureDetector> detector;
 Ptr<BOWKMeansTrainer> bowTrainer;
@@ -62,7 +55,6 @@ CvNormalBayesClassifier NBclassifier;
 CvKNearest KNNclassifier;
 CvSVM SVMclassifier;
 CvDTree DTclassifier;
-
 
 void createAndFillConfusionMatrix (Mat realValues, Mat supposedRealValues) {            //Tirar testes e printfs
     int i, j;
@@ -194,6 +186,7 @@ void extractBOWDescriptor(const path& basepath, Mat& descriptors, Mat& labels) {
 void createDictionary(string d, string e) {
     extractor = DescriptorExtractor::create(e);
     detector = FeatureDetector::create(d);
+    matcher = DescriptorMatcher::create("FlannBased");
     if (extractor ==  NULL )
            cerr << "Erro ao criar extrator de descritor: " << e << endl;
        if (detector == NULL)
@@ -286,41 +279,30 @@ void predict (char name[], Mat evalData, Mat * results) {
 }
 
 int main(int argc, char ** argv) {
-    string extractors[] = {"SIFT", "SURF"}; // "BRIEF", "ORB"
-    string detectors[] = {"FAST", "STAR", "SIFT", "SURF"};
-    //"ORB", "MSER", "GFTT", "HARRIS", "Dense", "SimpleBlob"};
-
-    char classifiers[][22] = {"NormalBayesClassifier", "KNearest", "SVM", "DTree"};
-
-    int i, j, k;
-
-    for (i = 0; i < NDETECTORS; i++) {
-        for (j = 0; j < NEXTRACTORS; j++) {
-            createDictionary(detectors[3], extractors[1]);
-            Mat results;
-            Mat trainingData(0, dictionarySize, CV_32FC1);
-            Mat labels(0, 1, CV_32FC1);
-            Mat evalData(0, dictionarySize, CV_32FC1);
-            Mat groundTruth(0, 1, CV_32FC1);
-            cout<<"Processando conjunto de treinamento..."<<endl;
-            extractBOWDescriptor(path(TRAINING_DATA_DIR), trainingData, labels);
-            cout<<"Processando conjunto de teste..."<<endl;
-            extractBOWDescriptor(path(EVAL_DATA_DIR), evalData, groundTruth);
-            for (k = 0; k < NCLASSIFIERS; k++) {
-                cout << "\n_______" << classifiers[k] << " - "<< detectors[3] << " - " << extractors[1] << "_______\n";
-                cout<<"Treinando classificador..."<<endl;
-                //train(classifiers[k], trainingData, labels);
-                NormalBayesClassifier c;
-                c.train(trainingData, labels);
-                cout<<"Avaliando classificador..."<<endl;
-                c.predict(evalData, &results);
-                //predict(classifiers[k], evalData, &results);
-                double errorRate = (double) countNonZero(groundTruth - results) / evalData.rows;
-                cout << "Taxa de erro: " << errorRate << endl;
-				confidenceInterval(errorRate, results.rows);
-                createAndFillConfusionMatrix(groundTruth, results);
-            }
-
-        }
+    if (argc < 4) {
+        printf("Uso:\n./%s detector extrator classificador\n", argv[0]);
+        cout << "Valores possiveis para detector: FAST, STAR, SIFT, SURF" <<
+        endl << "Valores possiveis para extrator: SIFT, SURF" << endl <<
+        "Valores possiveis para classificador: NormalBayesClassifier, KNearest,"
+        << " SVM, DTree" << endl;
     }
+    createDictionary(argv[1], argv[2]);
+    Mat trainingData(0, dictionarySize, CV_32FC1);
+    Mat labels(0, 1, CV_32FC1);
+    Mat evalData(0, dictionarySize, CV_32FC1);
+    Mat groundTruth(0, 1, CV_32FC1);
+    cout<<"Processando conjunto de treinamento..."<<endl;
+    extractBOWDescriptor(path(TRAINING_DATA_DIR), trainingData, labels);
+    cout<<"Processando conjunto de teste..."<<endl;
+    extractBOWDescriptor(path(EVAL_DATA_DIR), evalData, groundTruth);
+    cout << "\n_______" << argv[3] << " - "<< argv[1] << " - " << argv[2] << "_______\n";
+    cout<<"Treinando classificador..."<<endl;
+    train(argv[3], trainingData, labels);
+    Mat results;
+    cout<<"Avaliando classificador..."<<endl;
+    predict(argv[3], evalData, &results);
+    double errorRate = (double) countNonZero(groundTruth - results) / evalData.rows;
+    cout << "Taxa de erro: " << errorRate << endl;
+    confidenceInterval(errorRate, results.rows);
+    createAndFillConfusionMatrix(groundTruth, results);
 }
