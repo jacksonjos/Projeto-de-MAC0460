@@ -55,6 +55,7 @@ CvNormalBayesClassifier NBclassifier;
 CvKNearest KNNclassifier;
 CvSVM SVMclassifier;
 CvDTree DTclassifier;
+CvBoost Bclassifier;
 
 void createAndFillConfusionMatrix (Mat realValues, Mat supposedRealValues) {            //Tirar testes e printfs
     int i, j;
@@ -215,12 +216,10 @@ void train (char name[], Mat trainingData, Mat labels) {
         SVMclassifier.train(trainingData, labels);
     else if (strcmp(name, "DTree") == 0)
         DTclassifier.train(trainingData, CV_ROW_SAMPLE, labels);
+    else if (strcmp(name, "Boost") == 0)
+        Bclassifier.train(trainingData, CV_ROW_SAMPLE, labels);
 
     /*
-    else if (strcmp(name, "Boost") == 0) {
-        CvBoost classifier;
-        classifier.train(*trainingData, CV_ROW_SAMPLE, *labels);
-    }
     else if (strcmp(name, "GradientBoostedTrees") == 0) {
         CvGBTrees classifier;
         classifier.train(*trainingData,  CV_ROW_SAMPLE, *labels);
@@ -246,9 +245,8 @@ void predict (char name[], Mat evalData, Mat * results) {
 
     else if (strcmp(name, "SVM") == 0) {
         int i;
-        results = new Mat(evalData.rows, 1, CV_32FC1);
         for (i = 0; i < evalData.rows; i++)
-            results->at<float>(i, 0) = SVMclassifier.predict(evalData.row(i));
+            results->push_back(SVMclassifier.predict(evalData.row(i)));
     }
 
     else if (strcmp(name, "DTree") == 0) {
@@ -257,6 +255,11 @@ void predict (char name[], Mat evalData, Mat * results) {
         for (i = 0; i < evalData.rows; i++)
             results->at<float>(i, 0) = DTclassifier.predict(evalData.row(i))->value;
     }
+    else if (strcmp(name, "Boost") == 0) {
+         int i;
+         for (i = 0; i < evalData.rows; i++)
+             results->push_back(Bclassifier.predict(evalData.row(i)));
+     }
     /*
     else if (strcmp(name, "Boost") == 0) {
         CvBoost classifier;
