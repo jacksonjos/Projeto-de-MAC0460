@@ -281,7 +281,7 @@ int main(int argc, char ** argv) {
         cout << "Valores possiveis para detector: FAST, STAR, SIFT, SURF" <<
         endl << "Valores possiveis para extrator: SIFT, SURF" << endl <<
         "Valores possiveis para classificador: NormalBayesClassifier, KNearest,"
-        << " SVM, DTree" << endl;
+        << endl;
     }
     createDictionary(argv[1], argv[2]);
     Mat trainingData(0, dictionarySize, CV_32FC1);

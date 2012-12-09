@@ -5,8 +5,8 @@ import os
 import sys
 
 extractors = ("SIFT", "SURF")
-detectors = ("FAST", "STAR", "SIFT", "SURF")
-classifiers = ("NormalBayesClassifier", "KNearest", "SVM", "DTree")
+detectors = ("STAR", "SIFT", "SURF", "FAST")
+classifiers = ("NormalBayesClassifier", "KNearest")
 
 for detector in detectors:
     for extractor in extractors:
