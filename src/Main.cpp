@@ -40,7 +40,7 @@ int confusionMatrix[6][6];                          //GAMBIIIIIIII
 
 map<String, int> classes;
 /* Parametros do dicionario do modelo BOW */
-int dictionarySize = 1000;
+int dictionarySize = 300;
 TermCriteria tc(CV_TERMCRIT_ITER, 10, 0.001);
 int retries = 1;
 int flags = KMEANS_PP_CENTERS;
