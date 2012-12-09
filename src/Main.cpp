@@ -45,7 +45,7 @@ vector<String> training_data; /* Vetor com o nome das imagens de treinamento */
 vector<String> test_data; /* Vetor com o nome das iamgens de teste */
 map<String, int> classes;
 /* Parametros do dicionario do modelo BOW */
-int dictionarySize = 300;
+int dictionarySize = 1000;
 TermCriteria tc(CV_TERMCRIT_ITER, 10, 0.001);
 int retries = 1;
 int flags = KMEANS_PP_CENTERS;
